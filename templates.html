@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Шаблоны раскрасок</title>
+<style>
+  @page { size: A4; margin: 12mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #eef4f7; color: #111; font: 16px/1.4 "Segoe UI", system-ui, sans-serif; }
+  .bar { position: sticky; top: 0; display: flex; gap: 12px; align-items: center; justify-content: space-between;
+    padding: 12px 16px; background: #10324a; color: #fff; }
+  .bar button { min-height: 44px; padding: 8px 18px; border: 0; border-radius: 12px; background: #00afca; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+  .sheet { width: 186mm; min-height: 270mm; margin: 16px auto; padding: 8mm; background: #fff; box-shadow: 0 4px 20px rgba(0,0,0,.12);
+    display: flex; flex-direction: column; break-after: page; }
+  .sheet h1 { margin: 0; font-size: 26px; }
+  .sheet .sub { display: flex; justify-content: space-between; align-items: end; margin: 4mm 0 6mm; font-size: 18px; }
+  .sheet .name { flex: 1; margin-left: 8mm; border-bottom: 2px dashed #aab4bb; /* светлая: распознавание рамки не путает её с рамкой */ height: 1.4em; }
+  .frame { border: 4mm solid #111; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; padding: 6mm; }
+  .frame svg { width: 100%; height: 100%; }
+  .hint { margin-top: 6mm; text-align: center; color: #555; font-size: 15px; }
+  @media print {
+    body { background: #fff; }
+    .bar { display: none; }
+    .sheet { margin: 0; box-shadow: none; padding: 0; width: auto; min-height: 0; }
+  }
+  @media (max-width: 760px) { .sheet { width: auto; margin: 12px; } }
+</style>
+</head>
+<body>
+<div class="bar"><span>🖨️ Шаблоны «Оживи свой Казахстан» — по одному на лист A4</span><button onclick="print()">Печать</button></div>
+<div id="sheets"></div>
+<script src="figures.js"></script>
+<script>
+document.getElementById('sheets').innerHTML = FIGURES.map(f => `
+  <section class="sheet">
+    <h1>Оживи свой Казахстан · ${f.name}</h1>
+    <div class="sub"><span>Имя:</span><span class="name"></span></div>
+    <div class="frame">${figureSVG(f, 'outline', 5)}</div>
+    <div class="hint">Раскрась ярко, не выходя за рамку. Потом сфотографируй лист целиком — рисунок оживёт на экране!</div>
+  </section>`).join('');
+</script>
+</body>
+</html>

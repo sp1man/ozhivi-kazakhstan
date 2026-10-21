@@ -1,0 +1,591 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Оживи свой Казахстан</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2300afca'/%3E%3Ccircle cx='32' cy='28' r='12' fill='%23ffd23f'/%3E%3Cpath d='M6 54 Q32 36 58 54 Z' fill='%2340c057'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --glass: rgba(255,255,255,.86); --ink: #10324a; --dim: #4d6a80;
+    --accent: #00afca; --gold: #ffc61a; --radius: 14px;
+    --shadow: 0 1px 2px rgba(16,50,74,.08), 0 8px 24px rgba(16,50,74,.14);
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #bfe6f7; color: var(--ink);
+    font: 16px/1.4 "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; }
+  #scene { position: fixed; inset: 0; width: 100%; height: 100%; }
+  #stage { position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; }
+  .cloud { animation: drift linear infinite; }
+  @keyframes drift { from { transform: translateX(-400px); } to { transform: translateX(2000px); } }
+  .sun-rays { transform-origin: 1330px 150px; animation: spin 60s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .chip { position: fixed; top: 16px; left: 16px; display: flex; gap: 10px; align-items: center;
+    padding: 10px 16px; border-radius: 999px; background: var(--glass); box-shadow: var(--shadow);
+    backdrop-filter: blur(10px); font-weight: 600; z-index: 5; }
+  .chip b { font-size: 22px; letter-spacing: .12em; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .chip[hidden] { display: none; }
+
+  .panel { position: fixed; top: 16px; right: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 5;
+    transition: transform .25s ease, opacity .25s ease; }
+  .panel.tucked { transform: translateX(calc(100% + 24px)); opacity: 0; pointer-events: none; }
+  .btn { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 10px 16px; border: 0;
+    border-radius: var(--radius); background: var(--glass); color: var(--ink); box-shadow: var(--shadow);
+    backdrop-filter: blur(10px); font: inherit; font-weight: 600; cursor: pointer; text-align: left;
+    text-decoration: none; transition: transform .12s ease, background .12s ease; }
+  .btn:hover { background: #fff; }
+  .btn:active { transform: scale(.97); }
+  .btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .btn .ic { width: 22px; text-align: center; font-size: 18px; }
+  .btn.primary { background: var(--accent); color: #fff; }
+  .btn.primary:hover { background: #009bb4; }
+  .toggle { position: fixed; right: 16px; bottom: 16px; z-index: 6; }
+
+  .banner { position: fixed; left: 16px; bottom: 16px; z-index: 5; padding: 12px 18px; border-radius: var(--radius);
+    background: linear-gradient(90deg, #00afca, #0090b0); color: #fff; box-shadow: var(--shadow); max-width: min(560px, calc(100% - 100px)); }
+  .banner strong { display: block; font-size: 20px; }
+  .banner span { opacity: .9; font-size: 14px; }
+
+  dialog { border: 0; border-radius: 20px; padding: 0; width: min(620px, calc(100% - 32px)); box-shadow: 0 24px 64px rgba(0,0,0,.3); color: var(--ink); }
+  dialog::backdrop { background: rgba(8,30,46,.45); backdrop-filter: blur(3px); }
+  .dlg { padding: 24px; }
+  .dlg h2 { margin: 0 0 6px; font-size: 22px; }
+  .dlg p { margin: 0 0 14px; color: var(--dim); }
+  .figs { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; margin: 12px 0 16px; }
+  .fig { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px; border: 2px solid #e3edf3;
+    border-radius: 12px; background: #fff; cursor: pointer; font: inherit; font-size: 14px; color: var(--ink); }
+  .fig svg { width: 64px; height: 64px; }
+  .fig[aria-pressed="true"] { border-color: var(--accent); background: #e9f9fc; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .btn.ghost { box-shadow: none; background: #eef4f7; }
+  .big { font-size: 40px; font-weight: 800; letter-spacing: .14em; color: var(--accent); margin: 4px 0 10px; font-variant-numeric: tabular-nums; }
+  .url { font: 600 18px/1.3 ui-monospace, Consolas, monospace; background: #eef4f7; padding: 10px 12px; border-radius: 10px; word-break: break-all; }
+  .pair { display: grid; grid-template-columns: 220px 1fr; gap: 18px; align-items: center; margin-bottom: 8px; }
+  .qr { width: 220px; height: 220px; padding: 0; overflow: hidden; border-radius: 14px; background: #fff; border: 2px solid #e3edf3; }
+  .qr svg { display: block; width: 100%; height: 100%; }
+  .lbl2 { font-size: 14px; color: var(--dim); margin: 4px 0; }
+  .chip { cursor: pointer; }
+  @media (max-width: 560px) { .pair { grid-template-columns: 1fr; justify-items: center; } }
+  video { width: 100%; border-radius: 12px; background: #000; display: block; margin-bottom: 12px; }
+  .status { min-height: 1.4em; color: var(--dim); font-size: 14px; margin-top: 8px; }
+  .toast { position: fixed; left: 50%; top: 18px; transform: translate(-50%, calc(-100% - 40px)); z-index: 9; padding: 12px 20px;
+    border-radius: 999px; background: #10324a; color: #fff; font-weight: 600; box-shadow: var(--shadow); transition: transform .3s ease; }
+  .toast.show { transform: translate(-50%, 0); }
+  @media (max-width: 700px) {
+    .panel { left: 16px; top: auto; bottom: 84px; flex-direction: row; flex-wrap: wrap; }
+    .btn { min-height: 40px; padding: 8px 12px; font-size: 14px; }
+    .banner { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { .cloud, .sun-rays { animation: none; } }
+</style>
+</head>
+<body>
+<svg id="scene" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5fb8ec"/><stop offset=".65" stop-color="#c9ecfb"/></linearGradient>
+    <linearGradient id="far" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fb3d6"/><stop offset="1" stop-color="#b9d3e8"/></linearGradient>
+    <linearGradient id="mid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5f86ad"/><stop offset="1" stop-color="#86a9c8"/></linearGradient>
+    <linearGradient id="steppe" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fd14f"/><stop offset="1" stop-color="#3f9a2f"/></linearGradient>
+    <linearGradient id="steppe2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7cc443"/><stop offset="1" stop-color="#2f8526"/></linearGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#sky)"/>
+  <g class="sun-rays" opacity=".55">
+    <g fill="#ffd23f">
+      <path d="M1330 150 L1322 40 L1338 40 Z"/><path d="M1330 150 L1322 40 L1338 40 Z" transform="rotate(30 1330 150)"/>
+      <path d="M1330 150 L1322 40 L1338 40 Z" transform="rotate(60 1330 150)"/><path d="M1330 150 L1322 40 L1338 40 Z" transform="rotate(90 1330 150)"/>
+      <path d="M1330 150 L1322 40 L1338 40 Z" transform="rotate(120 1330 150)"/><path d="M1330 150 L1322 40 L1338 40 Z" transform="rotate(150 1330 150)"/>
+      <path d="M1330 150 L1322 40 L1338 40 Z" transform="rotate(180 1330 150)"/><path d="M1330 150 L1322 40 L1338 40 Z" transform="rotate(210 1330 150)"/>
+      <path d="M1330 150 L1322 40 L1338 40 Z" transform="rotate(240 1330 150)"/><path d="M1330 150 L1322 40 L1338 40 Z" transform="rotate(270 1330 150)"/>
+      <path d="M1330 150 L1322 40 L1338 40 Z" transform="rotate(300 1330 150)"/><path d="M1330 150 L1322 40 L1338 40 Z" transform="rotate(330 1330 150)"/>
+    </g>
+  </g>
+  <circle cx="1330" cy="150" r="58" fill="#ffd23f"/>
+  <g fill="#fff" opacity=".92">
+    <g class="cloud" style="animation-duration:140s;animation-delay:-30s"><ellipse cx="0" cy="140" rx="90" ry="28"/><ellipse cx="40" cy="120" rx="55" ry="34"/><ellipse cx="-40" cy="128" rx="45" ry="26"/></g>
+    <g class="cloud" style="animation-duration:180s;animation-delay:-110s"><ellipse cx="0" cy="230" rx="70" ry="22"/><ellipse cx="30" cy="214" rx="42" ry="26"/></g>
+    <g class="cloud" style="animation-duration:160s;animation-delay:-70s"><ellipse cx="0" cy="90" rx="60" ry="18"/><ellipse cx="22" cy="78" rx="36" ry="22"/></g>
+  </g>
+  <path fill="url(#far)" d="M0 520 L140 400 L230 450 L360 330 L470 420 L560 360 L700 470 L820 340 L930 430 L1040 300 L1180 440 L1290 380 L1420 460 L1600 360 L1600 600 L0 600 Z"/>
+  <path fill="#fff" opacity=".9" d="M360 330 L330 358 L352 352 L370 366 L392 350 Z M820 340 L792 366 L815 360 L832 372 L852 358 Z M1040 300 L1004 336 L1030 328 L1046 344 L1072 326 Z"/>
+  <path fill="url(#mid)" d="M0 600 L120 500 L260 560 L400 470 L560 570 L700 500 L860 590 L1010 490 L1180 580 L1330 500 L1480 570 L1600 520 L1600 660 L0 660 Z"/>
+  <path fill="#e9f3fb" d="M400 470 L374 492 L396 488 L414 500 L430 486 Z M1010 490 L984 512 L1006 507 L1022 520 L1040 506 Z"/>
+  <path fill="url(#steppe2)" d="M0 640 Q300 590 640 630 T1260 620 T1600 610 L1600 900 L0 900 Z"/>
+  <path fill="url(#steppe)" d="M0 700 Q360 650 760 700 T1600 690 L1600 900 L0 900 Z"/>
+  <g stroke="#2f8526" stroke-width="4" stroke-linecap="round" fill="none" opacity=".6">
+    <path d="M120 820 l-6 -22 M126 820 l4 -26 M132 820 l10 -20"/><path d="M420 760 l-6 -22 M426 760 l4 -26 M432 760 l10 -20"/>
+    <path d="M760 850 l-6 -22 M766 850 l4 -26 M772 850 l10 -20"/><path d="M1090 780 l-6 -22 M1096 780 l4 -26 M1102 780 l10 -20"/>
+    <path d="M1420 840 l-6 -22 M1426 840 l4 -26 M1432 840 l10 -20"/>
+  </g>
+  <g>
+    <circle cx="260" cy="790" r="7" fill="#e03131"/><circle cx="560" cy="820" r="6" fill="#ffd23f"/><circle cx="900" cy="770" r="7" fill="#e03131"/>
+    <circle cx="1250" cy="830" r="6" fill="#ffd23f"/><circle cx="1500" cy="780" r="7" fill="#e03131"/>
+  </g>
+</svg>
+<canvas id="stage"></canvas>
+
+<div class="chip" id="codeChip" hidden>📱 Код для телефона: <b id="codeVal">—</b></div>
+
+<nav class="panel" id="panel" aria-label="Управление">
+  <button class="btn primary" id="bScan"><span class="ic">📷</span>Сканировать рисунок</button>
+  <button class="btn" id="bPhone" hidden><span class="ic">📱</span>Открыть на телефоне</button>
+  <a class="btn" href="templates.html" target="_blank"><span class="ic">🖨️</span>Скачать шаблоны</a>
+  <button class="btn" id="bDemo"><span class="ic">✨</span>Показать пример</button>
+  <button class="btn" id="bMusic" aria-pressed="false" hidden><span class="ic">🎵</span><span id="musicLbl">Музыка</span></button>
+  <button class="btn" id="bFull"><span class="ic">⛶</span>Во весь экран</button>
+  <button class="btn" id="bClear"><span class="ic">🧹</span>Очистить сцену</button>
+  <button class="btn" id="bAbout"><span class="ic">ℹ️</span>О проекте</button>
+</nav>
+<button class="btn toggle" id="bToggle" aria-label="Скрыть или показать меню"><span class="ic">☰</span></button>
+
+<div class="banner"><strong><svg width="30" height="20" viewBox="0 0 30 20" aria-hidden="true" style="vertical-align:-3px;margin-right:6px;border-radius:3px"><rect width="30" height="20" fill="#00afca"/><circle cx="15" cy="9" r="4" fill="#ffd23f"/><path d="M10 15 Q15 12 20 15" stroke="#ffd23f" stroke-width="1.5" fill="none"/></svg>С Днём Республики!</strong><span>Раскрась шаблон — и твой рисунок оживёт на этом экране</span></div>
+
+<dialog id="dScan"><div class="dlg">
+  <h2>Сканировать рисунок</h2>
+  <p>Выберите, что нарисовано, и сфотографируйте лист целиком — с чёрной рамкой.</p>
+  <div class="figs" id="figPick"></div>
+  <video id="cam" autoplay playsinline muted hidden></video>
+  <div class="row">
+    <button class="btn ghost" id="bClose1">Отмена</button>
+    <label class="btn ghost" for="file"><span class="ic">🖼️</span>Выбрать фото</label>
+    <button class="btn primary" id="bCam"><span class="ic">📷</span>Камера</button>
+  </div>
+  <input type="file" id="file" accept="image/*" capture="environment" hidden>
+  <div class="status" id="scanStatus" role="status"></div>
+</div></dialog>
+
+<dialog id="dPhone"><div class="dlg">
+  <h2>Отправка с телефона</h2>
+  <p id="phoneHint">Телефон должен быть в той же Wi-Fi сети. Наведите камеру телефона на QR-код — код с доски подставится сам.</p>
+  <div class="pair">
+    <div class="qr" id="qr" role="img" aria-label="QR-код для телефона"></div>
+    <div>
+      <div class="lbl2">Или откройте адрес вручную:</div>
+      <div class="url" id="phoneUrl">—</div>
+      <div class="lbl2">и введите код:</div>
+      <div class="big" id="phoneCode">—</div>
+    </div>
+  </div>
+  <div class="row"><button class="btn ghost" id="bClose2">Закрыть</button></div>
+</div></dialog>
+
+<dialog id="dAbout"><div class="dlg">
+  <h2>Оживи свой Казахстан</h2>
+  <p>Живая раскраска для занятий и классного часа. Дети раскрашивают шаблоны — беркута, юрту, коня, снежного барса, тюльпан, домбыру, мальчика, девочку, флаг, бабушку с бесіком и алтыбақан, — воспитатель фотографирует лист, и рисунок появляется на общей сцене: беркут летит над горами, конь скачет по степи, тюльпан растёт.</p>
+  <p>Фото обрабатывается прямо в браузере и никуда не отправляется, кроме этого экрана.</p>
+  <p>Любой рисунок на сцене можно взять мышкой или пальцем и перенести в другое место.</p>
+  <div class="row"><button class="btn ghost" id="bClose3">Закрыть</button></div>
+</div></dialog>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script src="vendor/qrcode.js"></script>
+<script src="vendor/peerjs.min.js"></script>
+<script src="figures.js"></script>
+<script src="scan.js"></script>
+<script src="music/playlist.js"></script>
+<script>
+const stage = document.getElementById('stage');
+const ctx = stage.getContext('2d');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let W = 0, H = 0, DPR = 1;
+function resize() {
+  DPR = Math.min(2, devicePixelRatio || 1);
+  W = innerWidth; H = innerHeight;
+  stage.width = W * DPR; stage.height = H * DPR;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+addEventListener('resize', resize); resize();
+
+// Высота неба/горизонта считается от сцены SVG (slice): горизонт степи ≈ 70% высоты.
+const sprites = [];
+const MAX = 40;
+const rand = (a, b) => a + Math.random() * (b - a);
+
+function addSprite(img, motion) {
+  const base = { fly: .15, stay: .2, run: .18, walk: .15, stroll: .2, grow: .15, float: .2, flag: .3, rock: .26, swing: .32, drift: .18 }[motion] || .18;
+  const h = Math.min(H, W * .75) * base; // на узком экране меряем от ширины
+  const w = h * (img.width / img.height);
+  const s = { img, motion, w, h, t: 0, born: performance.now(), dir: Math.random() < .5 ? 1 : -1, seed: Math.random() * 10 };
+  if (motion === 'fly') { s.y = rand(H * .12, H * .38); s.x = s.dir > 0 ? -w : W + w; s.v = rand(90, 140); }
+  else if (motion === 'run') { s.y = rand(H * .74, H * .86); s.x = s.dir > 0 ? -w : W + w; s.v = rand(150, 210); }
+  else if (motion === 'walk') { s.y = rand(H * .66, H * .74); s.x = s.dir > 0 ? -w : W + w; s.v = rand(50, 80); }
+  else if (motion === 'stroll') { s.y = rand(H * .8, H * .93); s.x = s.dir > 0 ? -w : W + w; s.v = rand(35, 55); }
+  else if (['stay', 'grow', 'flag', 'rock', 'swing'].includes(motion)) { s.x = rand(W * .1, W * .9); s.y = rand(H * .78, H * .92); }
+  else { s.x = rand(W * .2, W * .8); s.y = rand(H * .3, H * .6); s.vx = rand(-30, 30); }
+  s.puffs = [];
+  sprites.push(s);
+  if (sprites.length > MAX) sprites.shift();
+  sprites.sort((a, b) => a.y - b.y); // дальние рисуем раньше
+}
+
+function drawImg(s, x, y, sx, sy, rot, anchorBottom) {
+  ctx.save();
+  ctx.translate(x, y);
+  if (rot) ctx.rotate(rot);
+  ctx.scale(sx, sy);
+  // anchorBottom: фигура стоит на земле, точка привязки — низ по центру
+  ctx.drawImage(s.img, -s.w / 2, anchorBottom ? -s.h : -s.h / 2, s.w, s.h);
+  ctx.restore();
+  // рамка для перетаскивания (без учёта наклона — для пальца этого хватает)
+  const hw = s.w * Math.abs(sx) / 2, hh = s.h * Math.abs(sy);
+  s.bb = anchorBottom ? [x - hw, y - hh, x + hw, y] : [x - hw, y - hh / 2, x + hw, y + hh / 2];
+}
+
+// Флаг на ветру: полотно режем на вертикальные полоски и качаем волной,
+// древко и подставка (левый край и низ рисунка) стоят на месте.
+const FLAG_POLE = .12, FLAG_CUT = .66;
+function flagCanvas(s) {
+  const img = s.img, iw = img.width, ih = img.height, pad = Math.round(ih * .06);
+  if (!s.off) { s.off = document.createElement('canvas'); s.off.width = iw; s.off.height = ih + pad * 2; }
+  const o = s.off.getContext('2d');
+  o.clearRect(0, 0, iw, ih + pad * 2);
+  const step = Math.max(2, Math.round(iw / 100)), cut = Math.round(ih * FLAG_CUT);
+  const wave = [];
+  for (let x = 0; x < iw; x += step) {
+    const k = Math.max(0, (x / iw - FLAG_POLE) / (1 - FLAG_POLE));
+    const ph = s.t * 5 - (x / iw) * 10 + s.seed;
+    const sw = Math.min(step + 1, iw - x);
+    o.drawImage(img, x, 0, sw, cut, x, pad + Math.sin(ph) * pad * .9 * k, sw, cut);
+    o.drawImage(img, x, cut, sw, ih - cut, x, pad + cut, sw, ih - cut);
+    wave.push([x, sw, Math.cos(ph) * .22 * k]);
+  }
+  // складки: светлее на гребне волны, темнее во впадине
+  o.globalCompositeOperation = 'source-atop';
+  for (const [x, sw, sh] of wave) {
+    o.fillStyle = sh > 0 ? `rgba(255,255,255,${sh})` : `rgba(0,0,0,${-sh})`;
+    o.fillRect(x, 0, sw, pad * 2 + cut);
+  }
+  o.globalCompositeOperation = 'source-over';
+  return { c: s.off, pad: pad * s.h / ih };
+}
+
+// Составные фигуры: куски рисунка (прямоугольники в долях ширины и высоты) качаются вокруг своих осей.
+// rock — бабушка качает бесік: бесік качается на полозьях, бабушка чуть наклоняется следом.
+// swing — алтыбақан: рама стоит, качели с детьми ходят маятником под перекладиной.
+const RIGS = {
+  rock: t => [
+    { r: [0, 0, .473, 1], p: [.19, .97], a: Math.sin(t * 2.2) * .035 },
+    { r: [.473, 0, 1, 1], p: [.736, .76], a: Math.sin(t * 2.2) * .13 },
+  ],
+  swing: t => [
+    { r: [0, 0, .242, 1] }, { r: [.757, 0, 1, 1] }, { r: [.242, 0, .757, .071] },
+    { r: [.242, .071, .757, 1], p: [.5, .034], a: Math.sin(t * 1.8) * .3 },
+  ],
+};
+function drawRig(s, pop) {
+  const { img, w, h } = s, iw = img.width, ih = img.height;
+  ctx.save(); ctx.translate(s.x, s.y); ctx.scale(pop, pop);
+  for (const { r, p, a } of RIGS[s.motion](s.t + s.seed)) {
+    ctx.save();
+    if (a) {
+      const px = -w / 2 + p[0] * w, py = -h + p[1] * h;
+      ctx.translate(px, py); ctx.rotate(a); ctx.translate(-px, -py);
+    }
+    ctx.drawImage(img, r[0] * iw, r[1] * ih, (r[2] - r[0]) * iw, (r[3] - r[1]) * ih,
+      -w / 2 + r[0] * w, -h + r[1] * h, (r[2] - r[0]) * w, (r[3] - r[1]) * h);
+    ctx.restore();
+  }
+  ctx.restore();
+  s.bb = [s.x - s.w * pop / 2, s.y - s.h * pop, s.x + s.w * pop / 2, s.y];
+}
+
+function shadow(x, y, w, alpha) {
+  ctx.save(); ctx.globalAlpha = alpha; ctx.fillStyle = '#1d5a1a';
+  ctx.beginPath(); ctx.ellipse(x, y, w * .38, w * .07, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  ctx.clearRect(0, 0, W, H);
+  for (const s of sprites) {
+    s.t += reduce ? dt * .2 : dt;
+    const appear = Math.max(0.01, Math.min(1, (now - s.born) / 700));
+    const pop = 1 - Math.pow(1 - appear, 3);
+    const flip = s.dir < 0 ? -1 : 1;
+    switch (s.motion) {
+      case 'fly': {
+        if (!s.dragging) s.x += s.v * s.dir * dt;
+        if (s.x > W + s.w) s.x = -s.w; if (s.x < -s.w) s.x = W + s.w;
+        const flap = 1 - .28 * (0.5 + 0.5 * Math.sin(s.t * 7 + s.seed));
+        const bob = Math.sin(s.t * 1.6 + s.seed) * 18;
+        drawImg(s, s.x, s.y + bob, pop, flap * pop, Math.sin(s.t * 1.6) * .05, false);
+        break;
+      }
+      case 'run': case 'walk': case 'stroll': {
+        if (!s.dragging) s.x += s.v * s.dir * dt;
+        if (s.x > W + s.w) s.x = -s.w; if (s.x < -s.w) s.x = W + s.w;
+        const g = { run: [11, 16, .05], walk: [5, 5, .02], stroll: [6, 7, .07] }[s.motion]; // темп, подскок, покачивание
+        const bob = -Math.abs(Math.sin(s.t * g[0])) * g[1];
+        shadow(s.x, s.y, s.w, .18);
+        drawImg(s, s.x, s.y + bob, flip * pop, pop, Math.sin(s.t * g[0]) * g[2], true);
+        break;
+      }
+      case 'rock': case 'swing': {
+        shadow(s.x, s.y, s.w, .2);
+        drawRig(s, pop);
+        break;
+      }
+      case 'flag': {
+        shadow(s.x - s.w * .41, s.y, s.w * .4, .2); // тень под древком
+        const f = flagCanvas(s);
+        ctx.save(); ctx.translate(s.x, s.y); ctx.scale(pop, pop);
+        ctx.drawImage(f.c, -s.w / 2, -s.h - f.pad, s.w, s.h + f.pad * 2);
+        ctx.restore();
+        s.bb = [s.x - s.w * pop / 2, s.y - s.h * pop, s.x + s.w * pop / 2, s.y];
+        break;
+      }
+      case 'stay': {
+        shadow(s.x, s.y, s.w, .2);
+        drawImg(s, s.x, s.y, pop, pop, 0, true);
+        // дымок из шанырака
+        if (!reduce && Math.random() < dt * 2.5) s.puffs.push({ x: s.x, y: s.y - s.h * .92, t: 0, r: rand(6, 10) });
+        for (const p of s.puffs) {
+          p.t += dt; p.y -= 26 * dt; p.x += Math.sin(p.t * 2 + s.seed) * 10 * dt;
+          ctx.globalAlpha = Math.max(0, .55 - p.t * .18); ctx.fillStyle = '#fff';
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.r + p.t * 7, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        s.puffs = s.puffs.filter(p => p.t < 3);
+        break;
+      }
+      case 'grow': {
+        const g = Math.max(0.01, Math.min(1, s.t / 1.6));
+        const grow = 1 - Math.pow(1 - g, 3);
+        drawImg(s, s.x, s.y, grow, grow, Math.sin(s.t * 1.8 + s.seed) * .07, true);
+        break;
+      }
+      default: { // float — домбыра и свои рисунки
+        if (!s.dragging) s.x += (s.vx || 0) * dt;
+        if (s.x < s.w / 2 && s.vx < 0 || s.x > W - s.w / 2 && s.vx > 0) s.vx = -s.vx;
+        const bob = Math.sin(s.t * 1.3 + s.seed) * 22;
+        drawImg(s, s.x, s.y + bob, pop, pop, Math.sin(s.t * .9 + s.seed) * .12, false);
+        if (s.motion === 'float' && !reduce) {
+          if (Math.random() < dt * 1.5) s.puffs.push({ x: s.x + rand(-s.w * .3, s.w * .3), y: s.y, t: 0, n: Math.random() < .5 ? '♪' : '♫' });
+          for (const p of s.puffs) {
+            p.t += dt; p.y -= 40 * dt;
+            ctx.globalAlpha = Math.max(0, 1 - p.t / 2.5); ctx.fillStyle = '#10324a';
+            ctx.font = '600 28px system-ui'; ctx.fillText(p.n, p.x, p.y);
+          }
+          ctx.globalAlpha = 1;
+          s.puffs = s.puffs.filter(p => p.t < 2.5);
+        }
+      }
+    }
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// --- перетаскивание: любой рисунок можно взять мышкой или пальцем и перенести
+let drag = null;
+function hit(px, py) {
+  for (let i = sprites.length - 1; i >= 0; i--) {
+    const b = sprites[i].bb;
+    if (b && px >= b[0] && px <= b[2] && py >= b[1] && py <= b[3]) return sprites[i];
+  }
+  return null;
+}
+stage.addEventListener('pointerdown', e => {
+  const s = hit(e.clientX, e.clientY); if (!s) return;
+  drag = { s, dx: s.x - e.clientX, dy: s.y - e.clientY };
+  s.dragging = true;
+  sprites.splice(sprites.indexOf(s), 1); sprites.push(s); // взятый — поверх остальных
+  stage.setPointerCapture(e.pointerId);
+  stage.style.cursor = 'grabbing';
+});
+stage.addEventListener('pointermove', e => {
+  if (!drag) { stage.style.cursor = hit(e.clientX, e.clientY) ? 'grab' : ''; return; }
+  drag.s.x = Math.max(0, Math.min(W, e.clientX + drag.dx));
+  drag.s.y = Math.max(0, Math.min(H, e.clientY + drag.dy));
+});
+function drop() {
+  if (!drag) return;
+  drag.s.dragging = false; drag = null;
+  sprites.sort((a, b) => a.y - b.y);
+  stage.style.cursor = '';
+}
+stage.addEventListener('pointerup', drop);
+stage.addEventListener('pointercancel', drop);
+
+const toastEl = document.getElementById('toast');
+let toastT;
+function toast(msg) {
+  toastEl.textContent = msg; toastEl.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(() => toastEl.classList.remove('show'), 2600);
+}
+
+const figById = Object.fromEntries(FIGURES.map(f => [f.id, f]));
+function svgToImage(svg) { return Scan.loadImage('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)); }
+
+async function addDemo() {
+  const f = FIGURES[Math.floor(Math.random() * FIGURES.length)];
+  const img = await svgToImage(figureSVG(f, 'color'));
+  const c = document.createElement('canvas'); c.width = c.height = 400;
+  c.getContext('2d').drawImage(img, 0, 0, 400, 400);
+  addSprite(Scan.trim(c), f.motion);
+}
+
+async function addFromPhoto(src, figId) {
+  const canvas = await Scan.process(src);
+  const f = figById[figId];
+  addSprite(canvas, f ? f.motion : 'drift');
+  toast(f ? `${f.name} ожил! 🎉` : 'Рисунок ожил! 🎉');
+}
+
+// --- окно сканирования
+const dScan = document.getElementById('dScan');
+const figPick = document.getElementById('figPick');
+let chosen = 'berkut';
+const choices = [...FIGURES, { id: 'svoy', name: 'Свой рисунок', parts: [] }];
+figPick.innerHTML = choices.map(f => `<button class="fig" data-id="${f.id}" aria-pressed="${f.id === chosen}">${
+  f.parts.length ? figureSVG(f, 'color', 10) : '<svg viewBox="0 0 64 64"><text x="32" y="44" font-size="36" text-anchor="middle">🎨</text></svg>'
+}${f.name}</button>`).join('');
+figPick.addEventListener('click', e => {
+  const b = e.target.closest('.fig'); if (!b) return;
+  chosen = b.dataset.id;
+  figPick.querySelectorAll('.fig').forEach(x => x.setAttribute('aria-pressed', x === b));
+});
+
+const cam = document.getElementById('cam');
+const scanStatus = document.getElementById('scanStatus');
+let stream = null;
+function stopCam() { if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; cam.hidden = true; document.getElementById('bCam').innerHTML = '<span class="ic">📷</span>Камера'; }
+document.getElementById('bScan').onclick = () => { scanStatus.textContent = ''; dScan.showModal(); };
+document.getElementById('bClose1').onclick = () => { stopCam(); dScan.close(); };
+dScan.addEventListener('close', stopCam);
+document.getElementById('bCam').onclick = async () => {
+  if (!stream) {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 } } });
+      cam.srcObject = stream; cam.hidden = false;
+      document.getElementById('bCam').innerHTML = '<span class="ic">⚪</span>Снять';
+      scanStatus.textContent = 'Поднесите лист к камере, чтобы рамка была видна целиком.';
+    } catch { scanStatus.textContent = 'Камера недоступна — выберите готовое фото.'; }
+    return;
+  }
+  const c = document.createElement('canvas'); c.width = cam.videoWidth; c.height = cam.videoHeight;
+  c.getContext('2d').drawImage(cam, 0, 0);
+  stopCam(); dScan.close();
+  await addFromPhoto(c, chosen === 'svoy' ? null : chosen);
+};
+document.getElementById('file').onchange = async e => {
+  const file = e.target.files[0]; if (!file) return;
+  scanStatus.textContent = 'Обрабатываю…';
+  const url = await Scan.fileToDataURL(file);
+  e.target.value = '';
+  dScan.close();
+  await addFromPhoto(url, chosen === 'svoy' ? null : chosen);
+};
+
+// --- прочие кнопки
+document.getElementById('bDemo').onclick = addDemo;
+document.getElementById('bClear').onclick = () => { sprites.length = 0; toast('Сцена очищена'); };
+document.getElementById('bFull').onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {});
+const dAbout = document.getElementById('dAbout');
+document.getElementById('bAbout').onclick = () => dAbout.showModal();
+document.getElementById('bClose3').onclick = () => dAbout.close();
+document.getElementById('bToggle').onclick = () => document.getElementById('panel').classList.toggle('tucked');
+
+// --- фоновая музыка: свободные треки с Pixabay по кругу в случайном порядке.
+// Браузер не даёт играть звук до первого касания — поэтому стартуем по первому клику на странице.
+const bMusic = document.getElementById('bMusic');
+const tracks = (window.PLAYLIST || []).slice().sort(() => Math.random() - .5);
+const music = new Audio(); music.volume = .45;
+let ti = 0, fails = 0, musicOn = true;
+try { musicOn = localStorage.getItem('ozhivi-music') !== 'off'; } catch {}
+function musicLabel() {
+  bMusic.setAttribute('aria-pressed', musicOn);
+  document.getElementById('musicLbl').textContent = musicOn ? 'Музыка: вкл' : 'Музыка: выкл';
+}
+function playNext() {
+  const t = tracks[ti++ % tracks.length];
+  music.src = 'music/' + t.file;
+  music.play().then(() => { fails = 0; toast('🎵 ' + t.title); }).catch(() => {});
+}
+music.onended = playNext;
+music.onerror = () => { if (++fails < tracks.length) playNext(); };
+function musicStart() { if (!music.src) playNext(); else music.play().catch(() => {}); }
+if (tracks.length) {
+  bMusic.hidden = false; musicLabel();
+  bMusic.onclick = () => {
+    musicOn = !musicOn; musicLabel();
+    try { localStorage.setItem('ozhivi-music', musicOn ? 'on' : 'off'); } catch {}
+    musicOn ? musicStart() : music.pause();
+  };
+  if (musicOn) musicStart();
+  addEventListener('pointerdown', e => { if (musicOn && music.paused && !bMusic.contains(e.target)) musicStart(); });
+}
+
+// --- связь с телефоном.
+// Через server.py (локальная сеть) — опрос api/poll. На хостинге сервера нет —
+// тогда телефон шлёт фото прямо в браузер доски через WebRTC (PeerJS), код = адрес доски.
+const dPhone = document.getElementById('dPhone');
+document.getElementById('bClose2').onclick = () => dPhone.close();
+const PEER_PREFIX = 'ozhivi-kz-';
+let since = 0;
+
+function showPairing(code, url) {
+  document.getElementById('codeVal').textContent = code;
+  document.getElementById('phoneCode').textContent = code;
+  document.getElementById('phoneUrl').textContent = url;
+  const qr = qrcode(0, 'M'); qr.addData(url); qr.make();
+  document.getElementById('qr').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 3, scalable: true }); // белое поле вокруг нужно сканеру
+  document.getElementById('codeChip').onclick = () => dPhone.showModal();
+  document.getElementById('codeChip').hidden = false;
+  const bp = document.getElementById('bPhone'); bp.hidden = false; bp.onclick = () => dPhone.showModal();
+}
+
+async function initServer() {
+  try {
+    const r = await fetch('api/info');
+    if (!r.ok) return initPeer();
+    const info = await r.json();
+    showPairing(info.code, info.phone_url);
+    since = info.last_id;
+    poll();
+  } catch { initPeer(); }
+}
+async function poll() {
+  try {
+    const r = await fetch('api/poll?since=' + since);
+    const items = await r.json();
+    for (const it of items) { since = Math.max(since, it.id); await addFromPhoto(it.image, it.figure); }
+  } catch {}
+  setTimeout(poll, 1500);
+}
+
+function initPeer(attempt = 0) {
+  if (typeof Peer === 'undefined' || location.protocol === 'file:') return;
+  // код живёт в браузере доски, чтобы после перезагрузки не менялся
+  let code = null;
+  try { code = localStorage.getItem('ozhivi-code'); } catch {}
+  if (!code || attempt) code = String(Math.floor(Math.random() * 100000)).padStart(5, '0');
+  const peer = new Peer(PEER_PREFIX + code);
+  peer.on('open', () => {
+    try { localStorage.setItem('ozhivi-code', code); } catch {}
+    showPairing(code, new URL('phone.html?code=' + code, location.href).href);
+    document.getElementById('phoneHint').textContent = 'Наведите камеру телефона на QR-код — код с доски подставится сам. Телефону нужен только интернет, сеть может быть любой.';
+  });
+  peer.on('connection', conn => {
+    conn.on('data', async d => {
+      try {
+        if (!d || typeof d.image !== 'string' || !d.image.startsWith('data:image/')) throw new Error('bad');
+        await addFromPhoto(d.image, d.figure || null);
+        conn.send({ ok: true });
+      } catch { conn.send({ ok: false }); }
+    });
+  });
+  peer.on('error', err => {
+    if (err.type === 'unavailable-id' && attempt < 3) { peer.destroy(); initPeer(attempt + 1); }
+  });
+  peer.on('disconnected', () => { if (!peer.destroyed) peer.reconnect(); });
+}
+initServer();
+// Пустая сцена скучна: при открытии выпускаем пару примеров.
+setTimeout(addDemo, 600); setTimeout(addDemo, 1500); if (location.hash === "#all") for (let i = 0; i < 8; i++) setTimeout(addDemo, 200 * i);
+</script>
+</body>
+</html>

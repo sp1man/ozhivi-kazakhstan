@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Отправить рисунок</title>
+<style>
+  :root { --ink: #10324a; --dim: #4d6a80; --accent: #00afca; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; background: linear-gradient(#5fb8ec, #c9ecfb 55%, #8fd14f 55%, #3f9a2f); color: var(--ink);
+    font: 17px/1.4 "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; padding: 16px; }
+  .card { max-width: 480px; margin: 0 auto; background: #fff; border-radius: 20px; padding: 20px; box-shadow: 0 12px 40px rgba(16,50,74,.25); }
+  h1 { margin: 0 0 4px; font-size: 22px; }
+  p { margin: 0 0 14px; color: var(--dim); }
+  label.lbl { display: block; font-weight: 600; margin: 14px 0 6px; }
+  input.code { width: 100%; font: 700 30px/1 ui-monospace, Consolas, monospace; letter-spacing: .3em; text-align: center;
+    padding: 12px; border: 2px solid #d6e4ec; border-radius: 12px; color: var(--ink); }
+  input.code:focus { outline: none; border-color: var(--accent); }
+  .figs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .fig { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; border: 2px solid #e3edf3;
+    border-radius: 12px; background: #fff; font: inherit; font-size: 13px; color: var(--ink); }
+  .fig svg { width: 52px; height: 52px; }
+  .fig[aria-pressed="true"] { border-color: var(--accent); background: #e9f9fc; }
+  .btn { display: flex; justify-content: center; align-items: center; gap: 8px; width: 100%; min-height: 54px; margin-top: 16px;
+    border: 0; border-radius: 14px; background: var(--accent); color: #fff; font: inherit; font-weight: 700; font-size: 18px; }
+  .btn:disabled { opacity: .5; }
+  .btn.ghost { background: #eef4f7; color: var(--ink); }
+  img.preview { width: 100%; border-radius: 12px; margin-top: 14px; display: none; }
+  .board-link { margin: 18px 0 0; font-size: 14px; text-align: center; }
+  .board-link a { color: var(--accent); font-weight: 600; }
+  .status { margin-top: 12px; min-height: 1.4em; text-align: center; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>📱 Отправить рисунок на экран</h1>
+  <p>Введите код с доски, выберите, что нарисовано, и сфотографируйте лист целиком вместе с чёрной рамкой.</p>
+
+  <label class="lbl" for="code">Код с доски</label>
+  <input class="code" id="code" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="00000">
+
+  <label class="lbl">Что нарисовано</label>
+  <div class="figs" id="figs"></div>
+
+  <input type="file" id="file" accept="image/*" capture="environment" hidden>
+  <button class="btn ghost" id="bShoot">📷 Сфотографировать</button>
+  <img class="preview" id="preview" alt="Снимок рисунка">
+  <button class="btn" id="bSend" disabled>🚀 Отправить на экран</button>
+  <div class="status" id="status" role="status"></div>
+  <p class="board-link">Это страница для телефона. Сцена с ожившими рисунками — <a href="./">открыть доску</a>.</p>
+</div>
+<script src="vendor/peerjs.min.js"></script>
+<script src="figures.js"></script>
+<script src="scan.js"></script>
+<script>
+const codeEl = document.getElementById('code');
+codeEl.value = new URLSearchParams(location.search).get('code') || '';
+let chosen = 'berkut', photo = null;
+const choices = [...FIGURES, { id: 'svoy', name: 'Свой', parts: [] }];
+const figs = document.getElementById('figs');
+figs.innerHTML = choices.map(f => `<button class="fig" data-id="${f.id}" aria-pressed="${f.id === chosen}">${
+  f.parts.length ? figureSVG(f, 'color', 10) : '<svg viewBox="0 0 64 64"><text x="32" y="44" font-size="36" text-anchor="middle">🎨</text></svg>'
+}${f.name}</button>`).join('');
+figs.onclick = e => {
+  const b = e.target.closest('.fig'); if (!b) return;
+  chosen = b.dataset.id;
+  figs.querySelectorAll('.fig').forEach(x => x.setAttribute('aria-pressed', x === b));
+};
+const status = document.getElementById('status');
+const bSend = document.getElementById('bSend');
+document.getElementById('bShoot').onclick = () => document.getElementById('file').click();
+document.getElementById('file').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  const img = await Scan.loadImage(await Scan.fileToDataURL(f));
+  // уменьшаем перед отправкой: быстрее по Wi-Fi
+  photo = Scan.downscale(img, 1200).toDataURL('image/jpeg', .82);
+  const pv = document.getElementById('preview'); pv.src = photo; pv.style.display = 'block';
+  bSend.disabled = false; status.textContent = '';
+};
+// Через server.py — обычный POST; на хостинге — напрямую в браузер доски через PeerJS.
+async function sendViaServer(payload) {
+  const r = await fetch('api/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  if (r.status === 404 || r.status === 405 || r.status === 501) return null; // сервера нет
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || 'ошибка');
+  return true;
+}
+function sendViaPeer(payload) {
+  return new Promise((ok, bad) => {
+    const peer = new Peer();
+    const fail = msg => { peer.destroy(); bad(new Error(msg)); };
+    const timer = setTimeout(() => fail('wrong code'), 15000);
+    peer.on('error', e => { clearTimeout(timer); fail(e.type === 'peer-unavailable' ? 'wrong code' : 'network'); });
+    peer.on('open', () => {
+      const conn = peer.connect('ozhivi-kz-' + payload.code, { reliable: true });
+      conn.on('open', () => conn.send({ figure: payload.figure, image: payload.image }));
+      conn.on('data', d => { clearTimeout(timer); setTimeout(() => peer.destroy(), 500); d && d.ok ? ok(true) : bad(new Error('bad')); });
+    });
+  });
+}
+bSend.onclick = async () => {
+  const code = codeEl.value.trim();
+  if (!/^\d{5}$/.test(code)) { status.textContent = 'Введите 5 цифр кода с доски'; codeEl.focus(); return; }
+  bSend.disabled = true; status.textContent = 'Отправляю…';
+  const payload = { code, figure: chosen === 'svoy' ? null : chosen, image: photo };
+  try {
+    let done = null;
+    try { done = await sendViaServer(payload); } catch (e) { if (e.message === 'wrong code') throw e; }
+    if (!done) await sendViaPeer(payload);
+    status.textContent = '✅ Готово! Смотрите на экран';
+    photo = null; document.getElementById('preview').style.display = 'none';
+  } catch (err) {
+    status.textContent = '❌ ' + (err.message === 'wrong code' ? 'Неверный код или доска закрыта — проверьте цифры на экране' : 'Не получилось отправить, попробуйте ещё раз');
+    bSend.disabled = false;
+  }
+};
+</script>
+</body>
+</html>
